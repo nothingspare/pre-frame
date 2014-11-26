@@ -1,53 +1,6 @@
-Application.service('Data', [
-	'$rootScope', '$http',
-	function ($rootScope, $http) {
-		var EspressoData = {
-			auth: {
-				username: '',
-				password: '',
-				apiBase: '',
-				endpoint: '',
-				apiKey: null
-			},
-			get: function (endpoint, params) {
-				return $http.get(EspressoData.auth.apiBase + '/' + endpoint, EspressoData.getRequestConfig());
-			},
-			getUrl: function (fullUrl, params) {
-				return $http.get(fullUrl, EspressoData.getRequestConfig());
-			},
-			getRequestConfig: function (merge) {
-				if (merge) {console.log('not implemented yet');}
-				return {
-					headers: {
-						Authorization: 'Espresso ' + EspressoData.auth.apiKey + ':1'
-					}
-				}
-			},
-			test: function () {
-				console.log(EspressoData);
-			}
-		};
-		$rootScope.$on('ConfigUpdate', function (event, data) {
-			if (!angular.equals(EspressoData.auth, data.auth)) {
-				if (!data.auth.apiKey) {
-					$http.post(data.auth.apiBase + '/@authentication', {
-						username: data.auth.username,
-						password: data.auth.password
-					}).success(function (auth) {
-						EspressoData.auth = data.auth;
-						EspressoData.auth.apiKey = auth.apikey;
-						$rootScope.$broadcast('AuthUpdate', EspressoData.auth);
-					});
-				}
-			}
-		});
-		return EspressoData;
-	}
-]);
-
 Application.controller('GridController', [
-	'$rootScope', '$scope', '$http', 'Transit', 'Data',
-	function ($rootScope, $scope, $http, Transit, Data) {
+	'$rootScope', '$scope', '$http', 'Transit', 'Data', '$timeout',
+	function ($rootScope, $scope, $http, Transit, Data, $timeout) {
 		//interfaces exposed to the user, and potentially firable from the container
 		$rootScope.controls = {};
 
@@ -185,15 +138,83 @@ Application.controller('GridController', [
 		$scope.setNextBatch = function (override) {
 			$scope.nextBatch = override;
 		};
+		$scope.populateMetadata = function (row) {
+			var metadata = {
+				action: 'INSERT',
+				href: Data.auth.apiBase + '/' + Data.auth.endpoint,
+			};
+			row['@metadata'] = metadata;
+			return row;
+		};
+		$scope.addRow = function () {
+			var row = _.object(_.keys($scope.table.named), []);
+			angular.forEach(row, function (element, index) {
+				row[index] = null;
+			});
+			$scope.populateMetadata(row);
+			$scope.data.unshift(row);
+			//populate the original data so the indexes align, side effect is undo doesn't remove inserted objects
+			$scope.originalData.unshift(angular.copy(row));
+			return row;
+		};
+		$scope.isValidRow = function (row) {
+			return row && row['@metadata'] && row['@metadata'];
+		};
+		$scope.isUnsavedInsertedRow = function (row) {
+			return row['@metadata'].action == 'INSERT';
+		};
+		$scope.isSavedInsertedRow = function (row) {
+			return row['@metadata'].verb == 'INSERT';
+		};
+		$scope.findInserts = function (arr, original) {
+			var inserts = {};
+			angular.forEach(arr, function (element, index) {
+				if ($scope.isValidRow(element) && $scope.isUnsavedInsertedRow(element)) {
+					inserts[index] = element;
+				}
+			});
+			return inserts;
+		};
+		$scope.save = function (rows) {
+			return Data.put(Data.auth.endpoint, rows);
+		};
+		$scope.replaceLocalInserts = function (inserts, summary) {
+			angular.forEach(inserts, function (element, index) {
+				$scope.data.splice(index, 1);
+				$scope.originalData.splice(index, 1);
+			});
+
+			angular.forEach(summary, function (element, index) {
+				if ($scope.isSavedInsertedRow(element) && element['@metadata'].resource == Data.auth.endpoint) {
+					$scope.data.unshift(element);
+					$scope.originalData.unshift(element);
+				}
+			});
+			$scope.data.push({});
+			$timeout(function () {
+				$scope.data.pop();
+			});
+		};
 
 		$rootScope.controls.fetch = function () {
 			$scope.appendRows($scope.nextBatch);
 		};
 		$rootScope.controls.insert = function () {
-			console.log('insert');
+			$scope.addRow();
 		};
 		$rootScope.controls.save = function () {
-			console.log('save');
+			var inserts = $scope.findInserts($scope.data, $scope.originalData);
+
+			if (inserts) {
+				$scope.save(_.values(inserts)).success(function (data) {
+					$scope.replaceLocalInserts(inserts, data.txsummary);
+					console.log(data);
+				})['error'](function (err) {
+					console.log(err);
+				});
+				console.log(inserts);
+				console.log('save');
+			}
 		};
 		$rootScope.controls.del = function () {
 			console.log('del');
@@ -218,7 +239,6 @@ Application.controller('GridController', [
 		$rootScope.controls.runSearch = function (filters) {
 			var parsed = 'filter=';
 			var filterArr = [];
-			console.log(filters);
 			angular.forEach(filters, function (filter, index) {
 				//column.name + operator.prefix + filter.text + operator.suffix
 				//customers %{text}%
