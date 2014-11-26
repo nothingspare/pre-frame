@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>HTTP iframe</title>
+
+		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/ng-grid/2.0.11/ng-grid.css"/>
+		<style>
+			.content{ height:720px; }
+			.ngGrid{ height:660px; }
+		</style>
+
+		<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.7.0/underscore-min.js"></script>
+		<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+		<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/angular.js/1.3.3/angular.min.js"></script>
+		<script type="text/javascript" src="nggrid.js"></script>
+		<script type="text/javascript" src="transit.js"></script>
+		<script type="text/javascript">
+			var Application = angular.module('Application', ['ngGrid']);
+			var Config = {};
+
+			$(document).ready(function () {
+				transit.addAppend('frame', window.frameElement.id);
+				transit.broadcast('startup', window.frameElement.id);
+			});
+		</script>
+		<script type="text/javascript" src="App.js"></script>
+		<script type="text/javascript" src="DataService.js"></script>
+		<script type="text/javascript" src="TransitService.js"></script>
+		<script type="text/javascript" src="GridController.js"></script>
+	</head>
+	<body>
+		<div id="container" ng-app="Application">
+			<div class="content" ng-controller="GridController">
+				<div class="gridStyle" ng-grid="options"></div>
+				<div class="gridFooter">
+					<button ng-if="config.controls.insert" ng-click="controls.insert();">Insert</button>
+					<button ng-if="config.controls.save" ng-click="controls.save();">Save</button>
+					<button ng-if="config.controls.del" ng-click="controls.del();">Delete</button>
+					<button ng-if="config.controls.search" ng-click="controls.search();">Search</button>
+					<button ng-if="config.controls.fetch" ng-click="controls.fetch();">Fetch</button>
+					<button ng-if="config.controls.undo" ng-click="controls.undo();">Undo</button>
+				</div>
+				<div class="filters" ng-if="config.controls.search" ng-show="params.filters">
+					<button ng-click="controls.addFilter();">Add Filter</button>
+					<div ng-repeat="filter in filters">
+						<button ng-click="controls.removeFilter($index);">-</button>
+						<select ng-options="column.name for column in table.columns" ng-model="filter.column"></select>
+						<select ng-options="operator.label for operator in operators" ng-model="filter.operator"></select>
+						<input ng-model="filter.text" placeholder="text"/>
+					</div>
+					<button ng-click="controls.runSearch(filters);">Run</button>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>
