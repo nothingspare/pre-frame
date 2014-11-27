@@ -44,7 +44,7 @@ Application.controller('GridController', [
 
 		$scope.$watch('table', function (current, previous) {
 			if (current && !angular.equals(current, previous)) {
-				console.log(current.named);
+				//console.log(current.named);
 			};
 		});
 
@@ -65,7 +65,6 @@ Application.controller('GridController', [
 					//getting it also removes it, which is desirable here
 					$scope.getPaginationObj(current);
 				}
-				console.log(current);
 			}
 		});
 
@@ -105,17 +104,25 @@ Application.controller('GridController', [
 			});
 		});
 
+		$scope.selected = {};
+		$scope.$watch('selected', function (current) {
+			console.log(current);
+		});
+
 		$scope.options = {
 			data: 'data',
 			enableCellSelection: true,
 			enableRowSelection: true,
 			enableCellEditOnFocus: true,
+			showSelectionCheckbox: true,
 			afterSelectionChange: function (row) {
 				if (row.selected) {
 					Transit.broadcast('RowSelected', row.entity);
+					$scope.selected[row.rowIndex] = $scope.data[row.rowIndex];
 				}
 				else {
 					Transit.broadcast('RowDeselected', row.entity);
+					delete $scope.selected[row.rowIndex];
 				}
 			},
 			//columnDefs: [{field: 'name', displayName: 'name'}]
@@ -141,7 +148,7 @@ Application.controller('GridController', [
 		$scope.populateMetadata = function (row) {
 			var metadata = {
 				action: 'INSERT',
-				href: Data.auth.apiBase + '/' + Data.auth.endpoint,
+				//href: Data.auth.apiBase + '/' + Data.auth.endpoint,
 			};
 			row['@metadata'] = metadata;
 			return row;
@@ -166,14 +173,39 @@ Application.controller('GridController', [
 		$scope.isSavedInsertedRow = function (row) {
 			return row['@metadata'].verb == 'INSERT';
 		};
+		$scope.isRowUpdating = function (row) {
+			return row['@metadata'].action == 'UPDATE';
+		};
+		$scope.isRowDeleting = function (row) {
+			return row['@metadata'].action == 'DELETE';
+		};
 		$scope.findInserts = function (arr, original) {
-			var inserts = {};
+			var changed = {};
 			angular.forEach(arr, function (element, index) {
 				if ($scope.isValidRow(element) && $scope.isUnsavedInsertedRow(element)) {
-					inserts[index] = element;
+					changed[index] = element;
 				}
 			});
-			return inserts;
+			return changed;
+		};
+		$scope.findUpdates = function (arr, original) {
+			console.log(arr);
+			var changed = {};
+			angular.forEach(arr, function (element, index) {
+				if ($scope.isValidRow(element) && $scope.isRowUpdating(element)) {
+					changed[index] = element;
+				}
+			});
+			return changed;
+		};
+		$scope.findDels = function (arr, original) {
+			var changed = {};
+			angular.forEach(arr, function (element, index) {
+				if ($scope.isValidRow(element) && $scope.isRowDeleting(element)) {
+					changed[index] = element;
+				}
+			});
+			return changed;
 		};
 		$scope.save = function (rows) {
 			return Data.put(Data.auth.endpoint, rows);
@@ -190,34 +222,101 @@ Application.controller('GridController', [
 					$scope.originalData.unshift(element);
 				}
 			});
+			$scope.forceGridRefresh();
+		};
+		$scope.forceGridRefresh = function () {
 			$scope.data.push({});
 			$timeout(function () {
 				$scope.data.pop();
 			});
 		};
+		$scope.setRowAction = function (index, action, force) {
+			//if override && action attribute exists
+			if (!force && $scope.data[index]['@metadata'].action) {
+				//don't update the action
+				return;
+			}
+			$scope.data[index]['@metadata'].action = action;
+		};
+		$scope.$on('ngGridEventEndCellEdit', function (event) {
+			var row = event.targetScope.$eval('row');
+			var data = {
+				row: row.entity,
+				index: row.rowIndex,
+				isSelected: row.selected,
+				isChanged: false
+			};
+			if (!angular.equals(data.row, $scope.originalData[data.index])) {
+				data.isChanged = true;
+				$scope.setRowAction(data.index, 'UPDATE', false);
+			}
+			Transit.broadcast('RowEdit', data);
+		});
+		$scope.replaceLocalUpdates = function (updates, summary) {
+			angular.forEach(summary, function (element, index) {
+				angular.forEach(updates, function (e, i) {
+					if ($scope.isValidRow(e) && $scope.isValidRow(element)) {
+						if (e['@metadata'].href == element['@metadata'].href) {
+							$scope.data[i] = element;
+							$scope.originalData[i] = angular.copy(element);
+						}
+					}
+				});
+			});
+			$scope.forceGridRefresh();
+		};
+		$scope.removeLocalDels = function (dels, summary) {
+			angular.forEach(summary, function (element, index) {
+				angular.forEach(dels, function (e, i) {
+					if (e['@metadata'].action != 'DELETE') { console.log('test'); return;}
+					if ($scope.isValidRow(e) && $scope.isValidRow(element)) {
+						if (e['@metadata'].href == element['@metadata'].href) {
+							$scope.data.splice(i, 1);
+							$scope.originalData.splice(i, 1);
+						}
+					}
+				});
+			});
+			$scope.forceGridRefresh();
+		};
 
 		$rootScope.controls.fetch = function () {
-			$scope.appendRows($scope.nextBatch);
+			if ($scope.nextBatch) {
+				$scope.appendRows($scope.nextBatch);
+			}
 		};
 		$rootScope.controls.insert = function () {
 			$scope.addRow();
 		};
 		$rootScope.controls.save = function () {
 			var inserts = $scope.findInserts($scope.data, $scope.originalData);
+			var updates = $scope.findUpdates($scope.data, $scope.originalData);
 
-			if (inserts) {
-				$scope.save(_.values(inserts)).success(function (data) {
+			var batch = _.extend({}, inserts, updates);
+
+			//if we have any batch attributes, save them
+			if (!angular.equals({}, batch)) {
+				$scope.save(_.values(batch)).success(function (data) {
 					$scope.replaceLocalInserts(inserts, data.txsummary);
+					$scope.replaceLocalUpdates(updates, data.txsummary);
+					console.log(updates, data);
+				})['error'](function (err) {
+					console.log(err);
+				});
+			}
+		};
+		$rootScope.controls.del = function () {
+			angular.forEach($scope.selected, function (element, index) {
+				$scope.setRowAction(index, 'DELETE', false);
+			});
+			if (!angular.equals({}, $scope.selected)) {
+				$scope.save(_.values($scope.selected)).success(function (data) {
+					$scope.removeLocalDels($scope.selected, data.txsummary);
 					console.log(data);
 				})['error'](function (err) {
 					console.log(err);
 				});
-				console.log(inserts);
-				console.log('save');
 			}
-		};
-		$rootScope.controls.del = function () {
-			console.log('del');
 		};
 		$rootScope.controls.search = function () {
 			$rootScope.params.filters = !$rootScope.params.filters;
@@ -250,6 +349,10 @@ Application.controller('GridController', [
 
 
 		//no expectations
+		Transit.on('ControlSave', $rootScope.controls.save);
+		//no expectations
+		Transit.on('ControlDel', $rootScope.controls.del);
+		//no expectations
 		Transit.on('ControlsFetch', $rootScope.controls.fetch);
 		//expects data to be row in grid
 		Transit.on('ControlSelectRow', function (event, data) {
@@ -263,6 +366,8 @@ Application.controller('GridController', [
 		Transit.on('ControlRunSearch', function (event, data) {
 			$rootScope.controls.runSearch(data);
 		});
+		//expects index and row object
+		Transit.on('ControlUpdateRow', function (event, data) {});
 
 		Transit.on('GetFrameState', function (event, data) {
 			var snapshot = {
@@ -271,5 +376,8 @@ Application.controller('GridController', [
 			};
 			Transit.broadcast(data, snapshot)
 		});
+		Transit.on('GetAllRows', function (event, data) {});
+		Transit.on('GetSelectedRows', function (event, data) {});
+		Transit.on('GetFilters', function (event, data) {});
 	}
 ]);

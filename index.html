@@ -11,16 +11,16 @@
 				auth: {
 					username: 'demo',
 					password: 'Password1',
-					apiBase: 'http://demo2.espressologic.com/rest/default/demo/v1',
-					endpoint: 'demo:customer'
+					apiBase: 'http://eval.espressologic.com/rest/ncytm/demo/v1',
+					endpoint: 'main:customer'
 				},
 				controls: {
 					//undo: false
 				}
 			});
 
-			espressoFrames.events.on('RowSelected', function (event, data) {
-				console.log(event, data);
+			espressoFrames.events.on('RowEdit', function (event, data) {
+				//console.log(data);
 			});
 			function selectRow (index) {
 				//testing broadcast to window object

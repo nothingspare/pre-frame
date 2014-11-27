@@ -13,7 +13,7 @@ Application.service('Data', [
 				return $http.get(EspressoData.auth.apiBase + '/' + endpoint, EspressoData.getRequestConfig());
 			},
 			put: function (endpoint, objects) {
-				return $http.post(EspressoData.auth.apiBase + '/' + endpoint, objects, EspressoData.getRequestConfig());
+				return $http.put(EspressoData.auth.apiBase + '/' + endpoint, objects, EspressoData.getRequestConfig());
 			},
 			getUrl: function (fullUrl, params) {
 				return $http.get(fullUrl, EspressoData.getRequestConfig());
