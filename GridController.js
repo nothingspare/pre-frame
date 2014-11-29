@@ -82,7 +82,34 @@ Application.controller('GridController', [
 			return Data.get(endpoint).success(function (rows) {
 				$scope.data = rows;
 				$scope.originalData = angular.copy(rows);
+				$scope.refreshColDefs();
 			});
+		};
+
+		$scope.refreshColDefs = function () {
+			if ($rootScope.config.columns) {
+				$scope.colDefs = $rootScope.config.columns;
+			}
+			else {
+				if ($scope.data[0]) {
+					var columns = _.keys($scope.data[0]);
+					angular.forEach(columns, function (column) {
+						if (column == '@metadata') {return;}
+						var words = _.words(_.humanize(column));
+						var display = [];
+						angular.forEach(words, function (word) {
+							display.push(_.capitalize(word));
+						});
+						$scope.colDefs.push({
+							field: column,
+							displayName: display.join(' ')
+						});
+					});
+				}
+				else {
+					console.log('no data, no column keys');
+				}
+			}
 		};
 
 		//expects a full url
@@ -105,9 +132,6 @@ Application.controller('GridController', [
 		});
 
 		$scope.selected = {};
-		$scope.$watch('selected', function (current) {
-			console.log(current);
-		});
 
 		$scope.options = {
 			data: 'data',
@@ -115,6 +139,8 @@ Application.controller('GridController', [
 			enableRowSelection: true,
 			enableCellEditOnFocus: true,
 			showSelectionCheckbox: true,
+			showFooter: true,
+			footerTemplate: 'gridFooter.html',
 			afterSelectionChange: function (row) {
 				if (row.selected) {
 					Transit.broadcast('RowSelected', row.entity);
@@ -125,8 +151,9 @@ Application.controller('GridController', [
 					delete $scope.selected[row.rowIndex];
 				}
 			},
-			//columnDefs: [{field: 'name', displayName: 'name'}]
+			columnDefs: 'colDefs'
 		};
+		$scope.colDefs = [];
 
 		$scope.isPaginated = function (data) {
 			if (data[data.length-1]) {
@@ -189,7 +216,6 @@ Application.controller('GridController', [
 			return changed;
 		};
 		$scope.findUpdates = function (arr, original) {
-			console.log(arr);
 			var changed = {};
 			angular.forEach(arr, function (element, index) {
 				if ($scope.isValidRow(element) && $scope.isRowUpdating(element)) {
@@ -242,7 +268,7 @@ Application.controller('GridController', [
 			var row = event.targetScope.$eval('row');
 			var data = {
 				row: row.entity,
-				index: row.rowIndex,
+				index: $scope.data.indexOf(row.entity),
 				isSelected: row.selected,
 				isChanged: false
 			};
@@ -323,7 +349,7 @@ Application.controller('GridController', [
 			console.log('search');
 		};
 		$rootScope.controls.undo = function () {
-			console.log('undo');
+			$scope.data = angular.copy($scope.originalData);
 		};
 		$rootScope.controls.addFilter = function () {
 			$scope.filters.push({

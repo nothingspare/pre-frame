@@ -2,6 +2,11 @@
 <html>
 	<head>
 		<title>HTTP Wrapper</title>
+
+		<style>
+			iframe{ border:none; }
+		</style>
+
 		<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
 		<script type="text/javascript" src="transit.js"></script>
 		<script type="text/javascript" src="espresso-frames.js"></script>
@@ -14,6 +19,7 @@
 					apiBase: 'http://eval.espressologic.com/rest/ncytm/demo/v1',
 					endpoint: 'main:customer'
 				},
+				//columns: [{field:'name', displayName:'You see that?'}],
 				controls: {
 					//undo: false
 				}
