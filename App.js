@@ -1,6 +1,10 @@
 Application.run([
-	'Transit', '$rootScope',
-	function (Transit, $rootScope) {
+	'Transit', '$rootScope', 'Templates',
+	function (Transit, $rootScope, Templates) {
+		$rootScope.log = function (output) {
+			console.log(output);
+		};
+
 		//broadcast when $rootScope.config updates
 		$rootScope.$watch('config', function (current) {
 			if (!current) {return;}
@@ -26,5 +30,8 @@ Application.run([
 			//set config
 			$rootScope.config = merge;
 		});
+
+		//Template definitions
+		Templates.add('foreignKey', '<input ng-init="parentLookup(this.$eval(\'row\'))" ng-class="\'colt\' + col.index" ng-model="COL_FIELD" ng-input="COL_FIELD"/>');
 	}
 ]);

@@ -1,6 +1,6 @@
 Application.controller('GridController', [
-	'$rootScope', '$scope', '$http', 'Transit', 'Data', '$timeout',
-	function ($rootScope, $scope, $http, Transit, Data, $timeout) {
+	'$rootScope', '$scope', '$http', 'Transit', 'Data', '$timeout', 'Templates',
+	function ($rootScope, $scope, $http, Transit, Data, $timeout, Templates) {
 		//interfaces exposed to the user, and potentially firable from the container
 		$rootScope.controls = {};
 
@@ -86,7 +86,7 @@ Application.controller('GridController', [
 			});
 		};
 
-		$scope.refreshColDefs = function () {
+		$scope.refreshColDefs = function (specialColumns) {
 			if ($rootScope.config.columns) {
 				$scope.colDefs = $rootScope.config.columns;
 			}
@@ -95,15 +95,20 @@ Application.controller('GridController', [
 					var columns = _.keys($scope.data[0]);
 					angular.forEach(columns, function (column) {
 						if (column == '@metadata') {return;}
+						var colDef = null;
 						var words = _.words(_.humanize(column));
 						var display = [];
 						angular.forEach(words, function (word) {
 							display.push(_.capitalize(word));
 						});
-						$scope.colDefs.push({
+						colDef = {
 							field: column,
 							displayName: display.join(' ')
-						});
+						}
+
+						if (colDef) {
+							$scope.colDefs.push(colDef);
+						}
 					});
 				}
 				else {
@@ -121,10 +126,51 @@ Application.controller('GridController', [
 			});
 		};
 
+		//a collection of columns and the foreign key they are a part of
+		$scope.foreignColumns = {};
+
+		//expects parents array from @tables request
+		$scope.getForeignKeys = function (parents) {
+			angular.forEach(parents, function (parent) {
+				angular.forEach(parent.parent_columns, function (column) {
+					$scope.foreignColumns[column] = parent;
+				});
+			});
+		};
+
+		$scope.parentLookup = function (ngRow) {
+			//grab the index
+			var index = $scope.data.indexOf(ngRow.entity);
+
+			//blur the dom element, required because of strange ng grid behaviors
+			$timeout(function () {
+				$('input').blur(); //prevents direct editing
+			});
+			
+
+
+			console.log(ngRow, index);
+		};
+
+		//watcher and modifier of default column definitions
+		//for example, by default foreign keys ought to behave differently than standard columns
+		$scope.$watch('colDefs', function (current, previous) {
+			var colDefKeys = _.indexBy(current, 'field');
+
+			angular.forEach(current, function (definition, index) {
+				//foreign key
+				if ($scope.foreignColumns[definition.field]) {
+					console.log('foriegn key case', definition.field);
+					current[index].editableCellTemplate = Templates.get('foreignKey', $scope.foreignColumns[definition.field]);
+				}
+			});
+		}, true);
+
 		$scope.$on('AuthUpdate', function (event, auth) {
 			$scope.getRows(auth.endpoint);
 			Data.get('@tables/' + auth.endpoint).success(function (data) {
 				$scope.table = data;
+				$scope.getForeignKeys($scope.table.parents);
 				angular.forEach($scope.table.columns, function (column, index) {
 					$scope.table.named = _.indexBy($scope.table.columns, 'name');
 				});
@@ -137,7 +183,8 @@ Application.controller('GridController', [
 			data: 'data',
 			enableCellSelection: true,
 			enableRowSelection: true,
-			enableCellEditOnFocus: true,
+			//enableCellEditOnFocus: true,
+			enableCellEdit: true,
 			showSelectionCheckbox: true,
 			showFooter: true,
 			footerTemplate: 'gridFooter.html',
@@ -338,7 +385,6 @@ Application.controller('GridController', [
 			if (!angular.equals({}, $scope.selected)) {
 				$scope.save(_.values($scope.selected)).success(function (data) {
 					$scope.removeLocalDels($scope.selected, data.txsummary);
-					console.log(data);
 				})['error'](function (err) {
 					console.log(err);
 				});
