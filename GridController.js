@@ -1,6 +1,6 @@
 Application.controller('GridController', [
-	'$rootScope', '$scope', '$http', 'Transit', 'Data', '$timeout', 'Templates',
-	function ($rootScope, $scope, $http, Transit, Data, $timeout, Templates) {
+	'$rootScope', '$scope', '$http', 'Transit', 'Data', '$timeout', 'Templates', '$modal',
+	function ($rootScope, $scope, $http, Transit, Data, $timeout, Templates, $modal) {
 		//interfaces exposed to the user, and potentially firable from the container
 		$rootScope.controls = {};
 
@@ -138,7 +138,7 @@ Application.controller('GridController', [
 			});
 		};
 
-		$scope.parentLookup = function (ngRow) {
+		$scope.parentLookup = function (ngRow, column) {
 			//grab the index
 			var index = $scope.data.indexOf(ngRow.entity);
 
@@ -146,10 +146,26 @@ Application.controller('GridController', [
 			$timeout(function () {
 				$('input').blur(); //prevents direct editing
 			});
-			
 
+			var modal = $modal.open({
+				templateUrl: 'partials/parentLookup.html',
+				controller: 'LookupController',
+				size: 'lg',
+				resolve: {
+					relationship: function () { return $scope.foreignColumns[column] }
+					//row: ngRow.entity,
+					//index: index
+				}
+			});
 
-			console.log(ngRow, index);
+			modal.result.then(function (record) {
+				console.log(record);
+				angular.forEach($scope.foreignColumns[column].child_columns, function (column, i) {
+					$scope.data[index][column] = record[$scope.foreignColumns[column].parent_columns[i]];
+				});
+				
+				$scope.setRowAction(index, 'UPDATE', false);
+			});
 		};
 
 		//watcher and modifier of default column definitions
@@ -160,7 +176,6 @@ Application.controller('GridController', [
 			angular.forEach(current, function (definition, index) {
 				//foreign key
 				if ($scope.foreignColumns[definition.field]) {
-					console.log('foriegn key case', definition.field);
 					current[index].editableCellTemplate = Templates.get('foreignKey', $scope.foreignColumns[definition.field]);
 				}
 			});
@@ -183,7 +198,6 @@ Application.controller('GridController', [
 			data: 'data',
 			enableCellSelection: true,
 			enableRowSelection: true,
-			//enableCellEditOnFocus: true,
 			enableCellEdit: true,
 			showSelectionCheckbox: true,
 			showFooter: true,
@@ -391,8 +405,11 @@ Application.controller('GridController', [
 			}
 		};
 		$rootScope.controls.search = function () {
+			console.log($scope.filters);
+			if (!$scope.filters.length) {
+				$rootScope.controls.addFilter();
+			}
 			$rootScope.params.filters = !$rootScope.params.filters;
-			console.log('search');
 		};
 		$rootScope.controls.undo = function () {
 			$scope.data = angular.copy($scope.originalData);

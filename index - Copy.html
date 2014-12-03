@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>HTTP Wrapper</title>
+
+		<style>
+			iframe{ border:none; }
+		</style>
+
+		<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+		<script type="text/javascript" src="transit.js"></script>
+		<script type="text/javascript" src="espresso-frames.js"></script>
+		<script type="text/javascript">
+			espressoFrames.init({
+				id: 'demoFrame',
+				auth: {
+					username: 'demo',
+					password: 'Password1',
+					apiBase: 'http://demodev.espressologic.com/rest/el-dev/demo/v1',
+					endpoint: 'demo:LineItem'
+				},
+				//columns: [{field:'name', displayName:'Name'}],
+				controls: {
+					//undo: false
+				}
+			});
+
+			espressoFrames.events.on('RowEdit', function (event, data) {
+				//console.log(data);
+			});
+			function selectRow (index) {
+				//testing broadcast to window object
+				espressoFrames.events.broadcast('ControlSelectRow', $('#selectRowIndex').val(), $('#demoFrame')[0].contentWindow);
+			};
+			function deselectRow (index) {
+				//testing broadcast to window object
+				espressoFrames.events.broadcast('ControlDeselectRow', $('#selectRowIndex').val(), $('#demoFrame')[0].contentWindow);
+			};
+			function search () {
+				//testing broadcast to iframe ID
+				espressoFrames.events.broadcast('GetFrameState', 'FrameStateReply', '#demoFrame');
+			};
+			espressoFrames.events.on('FrameStateReply', function (event, data) {
+				transit.broadcast('ControlRunSearch', [{
+					column: data.table.columns[0],
+					operator: data.operators[1],
+					text: '1000'
+				}], '#demoFrame');
+			});
+		</script>
+	</head>
+	<body>
+		<div id="container">
+			<div class="header">HTTP Container</div>
+			<div class="frame-one">
+				<iframe style="height:800px; width:100%;" id="demoFrame" src="frame.html"></iframe>
+			</div>
+			<div>
+				<button onclick="selectRow();">Select Row</button>
+				<input value="4" id="selectRowIndex"/>
+				<button onclick="deselectRow();">De-select Row</button>
+				<button onclick="search();">Search</button>
+			</div>
+		</div>
+	</body>
+</html>

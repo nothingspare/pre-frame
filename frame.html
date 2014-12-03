@@ -3,31 +3,39 @@
 	<head>
 		<title>HTTP iframe</title>
 
+		<link rel="stylesheet" href="bootstrap.css"/>
 		<style>
 			body{ margin:0; }
 			.content{ height:720px; }
 			.content .ngGrid{ height:660px; }
-			.content .ngHeaderCell{ background:#fff; color:#333; border:none; }
-			.content .ngHeaderCell .ngVerticalBarVisible{ background-color:#fff; }
-			.content .ngRow.even{ background:#f9f9f9; }
-			.content .ngRow.odd{ background:#fff; }
-			.content .ngViewport{ border-bottom:1px solid #d6d6d6; }
-			.content .gridFooter button:first-child{ border-left:1px #d6d6d6 solid; }
-			.content .gridFooter button{ background:#e6e6e6; margin:0; padding:8px 20px; border:0; color:#444; border:1px #d6d6d6 solid; border-left:none; border-top:none; }
-			.content .gridFooter button:hover{ background:#f6f6f6; }
+			.modal-content .ngGrid{ height:300px; }
+			.body .ngHeaderCell{ background:#fff; color:#333; border:none; }
+			.body .ngHeaderCell .ngVerticalBarVisible{ background-color:#fff; }
+			.body .ngRow.even{ background:#f9f9f9; }
+			.body .ngRow.odd{ background:#fff; }
+			.body .ngViewport{ border-bottom:1px solid #d6d6d6; }
+			.body button:first-child{ border-left:1px #d6d6d6 solid; }
+			.body button{ background:#e6e6e6; margin:0; padding:8px 20px; color:#444; border:1px #d6d6d6 solid; border-left:none; border-top:none; }
+			.body button:hover{ background:#f6f6f6; }
+			.body .modal-content{ padding:20px 20px 0; }
+			.modal-content .filters{ padding-bottom:20px; }
+			.body .filters button{ border-top:1px #d6d6d6 solid; border-left:1px #d6d6d6 solid; margin:2px 0; }
+			.body .ngRow.selected{ background: #DEF7E0;}
 		</style>
 		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/ng-grid/2.0.11/ng-grid.css"/>
 
 		<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.7.0/underscore-min.js"></script>
 		<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/underscore.string/2.3.3/underscore.string.min.js"></script>
 		<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+		<script type="text/javascript" src="bootstrap.min.js"></script>
 		<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/angular.js/1.3.3/angular.min.js"></script>
+		<script type="text/javascript" src="ui-bootstrap-tpls-0.12.0.min.js"></script>
 		<script type="text/javascript" src="nggrid.js"></script>
 		<script type="text/javascript" src="transit.js"></script>
 		<script type="text/javascript">
 			_.mixin(_.str.exports());
 			_.str.include('Underscore.string', 'string');
-			var Application = angular.module('Application', ['ngGrid']);
+			var Application = angular.module('Application', ['ngGrid', 'ui.bootstrap']);
 			var Config = {};
 
 			$(document).ready(function () {
@@ -40,18 +48,21 @@
 		<script type="text/javascript" src="DataService.js"></script>
 		<script type="text/javascript" src="TransitService.js"></script>
 		<script type="text/javascript" src="GridController.js"></script>
+		<script type="text/javascript" src="LookupController.js"></script>
 	</head>
-	<body>
+	<body class="body">
 		<div id="container" ng-app="Application">
 			<div class="content" ng-controller="GridController">
 				<div class="gridStyle" ng-grid="options"></div>
 				<div class="filters" ng-if="config.controls.search" ng-show="params.filters">
 					<button ng-click="controls.addFilter();">Add Filter</button>
-					<div ng-repeat="filter in filters">
+					<div ng-repeat="filter in filters" class="form-inline">
 						<button ng-click="controls.removeFilter($index);">-</button>
-						<select ng-options="column.name for column in table.columns" ng-model="filter.column"></select>
-						<select ng-options="operator.label for operator in operators" ng-model="filter.operator"></select>
-						<input ng-model="filter.text" placeholder="text"/>
+						<div class="form-group">
+							<select class="form-control" ng-options="column.name for column in table.columns" ng-model="filter.column"></select>
+							<select class="form-control" ng-options="operator.label for operator in operators" ng-model="filter.operator"></select>
+							<input class="form-control" ng-model="filter.text" placeholder="text"/>
+						</div>
 					</div>
 					<button ng-click="controls.runSearch(filters);">Run</button>
 				</div>

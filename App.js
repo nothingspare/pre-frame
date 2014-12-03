@@ -21,6 +21,13 @@ Application.run([
 					search: true,
 					fetch: true,
 					undo: true
+				},
+				parentControls: {
+					search: true,
+					fetch: true
+				},
+				parentColumns: {
+					//product: [{field:'name', displayName: 'NAMED'}]
 				}
 			};
 
@@ -32,6 +39,10 @@ Application.run([
 		});
 
 		//Template definitions
-		Templates.add('foreignKey', '<input ng-init="parentLookup(this.$eval(\'row\'))" ng-class="\'colt\' + col.index" ng-model="COL_FIELD" ng-input="COL_FIELD"/>');
+		Templates.add(
+			'foreignKey',
+			'<input ng-init="parentLookup(this.$eval(\'row\'), col.colDef.field)" ' + 
+				'ng-class="\'colt\' + col.index" ng-model="COL_FIELD" ng-input="COL_FIELD"/>'
+		);
 	}
 ]);
