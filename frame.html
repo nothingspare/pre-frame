@@ -53,18 +53,34 @@
 	<body class="body">
 		<div id="container" ng-app="Application">
 			<div class="content" ng-controller="GridController">
-				<div class="gridStyle" ng-grid="options"></div>
-				<div class="filters" ng-if="config.controls.search" ng-show="params.filters">
-					<button ng-click="controls.addFilter();">Add Filter</button>
-					<div ng-repeat="filter in filters" class="form-inline">
-						<button ng-click="controls.removeFilter($index);">-</button>
-						<div class="form-group">
-							<select class="form-control" ng-options="column.name for column in table.columns" ng-model="filter.column"></select>
-							<select class="form-control" ng-options="operator.label for operator in operators" ng-model="filter.operator"></select>
-							<input class="form-control" ng-model="filter.text" placeholder="text"/>
+				<div ng-if="config.controlBox == 'top'">
+					<div class="filters" ng-if="config.controls.search" ng-show="params.filters">
+						<button ng-click="controls.addFilter();">Add Filter</button>
+						<div ng-repeat="filter in filters" class="form-inline">
+							<button ng-click="controls.removeFilter($index);">-</button>
+							<div class="form-group">
+								<select class="form-control" ng-options="column.name for column in table.columns" ng-model="filter.column"></select>
+								<select class="form-control" ng-options="operator.label for operator in operators" ng-model="filter.operator"></select>
+								<input class="form-control" ng-model="filter.text" placeholder="text"/>
+							</div>
 						</div>
+						<button ng-click="controls.runSearch(filters);">Run</button>
 					</div>
-					<button ng-click="controls.runSearch(filters);">Run</button>
+				</div>
+				<div class="gridStyle" ng-grid="options"></div>
+				<div ng-if="config.controlBox == 'bottom'">
+					<div class="filters" ng-if="config.controls.search" ng-show="params.filters">
+						<button ng-click="controls.addFilter();">Add Filter</button>
+						<div ng-repeat="filter in filters" class="form-inline">
+							<button ng-click="controls.removeFilter($index);">-</button>
+							<div class="form-group">
+								<select class="form-control" ng-options="column.name for column in table.columns" ng-model="filter.column"></select>
+								<select class="form-control" ng-options="operator.label for operator in operators" ng-model="filter.operator"></select>
+								<input class="form-control" ng-model="filter.text" placeholder="text"/>
+							</div>
+						</div>
+						<button ng-click="controls.runSearch(filters);">Run</button>
+					</div>
 				</div>
 			</div>
 		</div>

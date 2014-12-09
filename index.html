@@ -11,7 +11,7 @@
 		<script type="text/javascript" src="transit.js"></script>
 		<script type="text/javascript" src="espresso-frames.js"></script>
 		<script type="text/javascript">
-			espressoFrames.init({
+			var frame = espressoFrames.init({
 				id: 'demoFrame',
 				auth: {
 					username: 'demo',
@@ -20,12 +20,18 @@
 					endpoint: 'demo:LineItem'
 				},
 				//columns: [{field:'name', displayName:'Name'}],
+				//columns: [{field:'product_number', displayName:'Product Number'}],
 				controls: {
-					//undo: false
-				}
+					//undo: false,
+					//search:false
+				},
+				controlBox: 'top',
+				//parentControls: {},
+				//css: { fileHandle: 'http://ae845a0.ngrok.com/mdh/espresso/container/loaded.css' },
+				//js: { fileHandle: 'http://ae845a0.ngrok.com/mdh/espresso/container/loaded.js' }
 			});
 
-			espressoFrames.events.on('RowEdit', function (event, data) {
+			espressoFrames.events.on('EventRowEdit', function (event, data) {
 				//console.log(data);
 			});
 			function selectRow (index) {
@@ -47,19 +53,42 @@
 					text: '1000'
 				}], '#demoFrame');
 			});
+			function insert () {
+				espressoFrames.events.broadcast('ControlInsertRow', {
+					row: {
+						qty_ordered: 1001
+					}
+				}, '#demoFrame');
+			}
+			function update () {
+				espressoFrames.events.broadcast('ControlUpdateRow', {
+					index: 3,
+					row: {
+						qty_ordered: 1000
+					}
+				}, '#demoFrame');
+				
+			}
+			$(document).ready(function () {
+				//transit.reply('CheckStartEdit', function (event, data) { return false; }, '#demoFrame');
+				//frame.reply('CheckParentLookup', function (e, d) { return false; });
+				frame.reply('CheckBeforeSearch', function (e, d) { return true; });
+			});
 		</script>
 	</head>
 	<body>
 		<div id="container">
 			<div class="header">HTTP Container</div>
 			<div class="frame-one">
-				<iframe style="height:800px; width:100%;" id="demoFrame" src="frame.html"></iframe>
+				<iframe style="height:800px; border:3px dashed red; display:inline-block; width:100%;" id="demoFrame" src="frame.html"></iframe>
 			</div>
 			<div>
 				<button onclick="selectRow();">Select Row</button>
 				<input value="4" id="selectRowIndex"/>
 				<button onclick="deselectRow();">De-select Row</button>
 				<button onclick="search();">Search</button>
+				<button onclick="update();">Update</button>
+				<button onclick="insert();">Insert</button>
 			</div>
 		</div>
 	</body>

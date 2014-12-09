@@ -25,7 +25,6 @@ Application.controller('LookupController', [
 			$scope.getRows(relationship.parent_table);
 			Data.get('@tables/' + relationship.parent_table).success(function (data) {
 				$scope.table = data;
-				console.log(relationship, data);
 			});
 		});
 
@@ -45,6 +44,7 @@ Application.controller('LookupController', [
 		};
 
 		$scope.refreshColDefs = function (specialColumns) {
+			$scope.colDefs = [];
 			if ($rootScope.config.parentColumns[relationship.name]) {
 				$scope.colDefs = $rootScope.config.parentColumns[relationship.name];
 			}

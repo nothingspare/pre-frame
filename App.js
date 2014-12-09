@@ -4,6 +4,25 @@ Application.run([
 		$rootScope.log = function (output) {
 			console.log(output);
 		};
+		$rootScope.loadCss = function (css) {
+			angular.forEach(css, function (url, name) {
+				var el = angular.element('<link/>', {
+					rel: 'stylesheet',
+					type: 'text/css',
+					href: url
+				});
+				angular.element('head').append(el);
+			});
+		};
+		$rootScope.loadJs = function (js) {
+			angular.forEach(js, function (url, name) {
+				var el = angular.element('<script>', {
+					type: 'text/javascript',
+					src: url
+				});
+				angular.element('head').append(el);
+			});
+		};
 
 		//broadcast when $rootScope.config updates
 		$rootScope.$watch('config', function (current) {
@@ -28,7 +47,9 @@ Application.run([
 				},
 				parentColumns: {
 					//product: [{field:'name', displayName: 'NAMED'}]
-				}
+				},
+				css: {},
+				js: {}
 			};
 
 			//merge data with default configs
@@ -36,6 +57,10 @@ Application.run([
 
 			//set config
 			$rootScope.config = merge;
+
+
+			$rootScope.loadCss($rootScope.config.css);
+			$rootScope.loadJs($rootScope.config.js);
 		});
 
 		//Template definitions

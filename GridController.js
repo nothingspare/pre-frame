@@ -42,12 +42,6 @@ Application.controller('GridController', [
 				suffix: '\'',
 		}];
 
-		$scope.$watch('table', function (current, previous) {
-			if (current && !angular.equals(current, previous)) {
-				//console.log(current.named);
-			};
-		});
-
 		$scope.$watch('data', function (current) {
 			if (current && !angular.equals(current, [])) {
 				if ($scope.isPaginated(current)) {
@@ -80,6 +74,18 @@ Application.controller('GridController', [
 				}
 			}
 			return Data.get(endpoint).success(function (rows) {
+				Transit.ping({
+					broadcast: 'EventAfterSearch',
+					data: {rows: rows},
+					onReply: function (event, data) {
+						if (data && data.rows) {
+							$scope.data = data.rows;
+							$scope.originalData = angular.copy(data.rows);
+							$scope.refreshColDefs();
+						}
+					},
+				}, window.parent);
+
 				$scope.data = rows;
 				$scope.originalData = angular.copy(rows);
 				$scope.refreshColDefs();
@@ -87,6 +93,7 @@ Application.controller('GridController', [
 		};
 
 		$scope.refreshColDefs = function (specialColumns) {
+			$scope.colDefs = [];
 			if ($rootScope.config.columns) {
 				$scope.colDefs = $rootScope.config.columns;
 			}
@@ -142,12 +149,7 @@ Application.controller('GridController', [
 			//grab the index
 			var index = $scope.data.indexOf(ngRow.entity);
 
-			//blur the dom element, required because of strange ng grid behaviors
-			$timeout(function () {
-				$('input').blur(); //prevents direct editing
-			});
-
-			var modal = $modal.open({
+			$scope.lookupModal = $modal.open({
 				templateUrl: 'partials/parentLookup.html',
 				controller: 'LookupController',
 				size: 'lg',
@@ -158,14 +160,41 @@ Application.controller('GridController', [
 				}
 			});
 
-			modal.result.then(function (record) {
-				console.log(record);
+			$scope.lookupModal.result.then(function (record) {
+				Transit.ping({
+					broadcast: 'ControlParentLookupSelection',
+					data: record,
+					onReply: function (event, data) {
+						if (data && data.row) {
+							angular.forEach($scope.foreignColumns[column].child_columns, function (column, i) {
+								$scope.data[index][column] = record[$scope.foreignColumns[column].parent_columns[i]];
+							});
+							
+							$scope.setRowAction(index, 'UPDATE', false);
+						}
+					},
+				}, window.parent);
 				angular.forEach($scope.foreignColumns[column].child_columns, function (column, i) {
 					$scope.data[index][column] = record[$scope.foreignColumns[column].parent_columns[i]];
 				});
 				
 				$scope.setRowAction(index, 'UPDATE', false);
 			});
+
+			//blur the dom element, required because of strange ng grid behaviors
+			$timeout(function () {
+				$('input').blur(); //prevents direct editing
+			});
+
+			Transit.ping({
+				broadcast: 'CheckParentLookup',
+				data: {},
+				onReply: function (event, data) {
+					if (!data) {
+						$scope.lookupModal.dismiss();						
+					}
+				},
+			}, window.parent);
 		};
 
 		//watcher and modifier of default column definitions
@@ -202,13 +231,17 @@ Application.controller('GridController', [
 			showSelectionCheckbox: true,
 			showFooter: true,
 			footerTemplate: 'gridFooter.html',
+			beforeSelectionChange: function (row) {
+				Transit.broadcast('EventBeforeSelection', row.entity);
+				return true;
+			},
 			afterSelectionChange: function (row) {
 				if (row.selected) {
-					Transit.broadcast('RowSelected', row.entity);
+					Transit.broadcast('EventRowSelected', row.entity);
 					$scope.selected[row.rowIndex] = $scope.data[row.rowIndex];
 				}
 				else {
-					Transit.broadcast('RowDeselected', row.entity);
+					Transit.broadcast('EventRowDeselected', row.entity);
 					delete $scope.selected[row.rowIndex];
 				}
 			},
@@ -241,15 +274,18 @@ Application.controller('GridController', [
 			row['@metadata'] = metadata;
 			return row;
 		};
-		$scope.addRow = function () {
-			var row = _.object(_.keys($scope.table.named), []);
-			angular.forEach(row, function (element, index) {
-				row[index] = null;
+		$scope.addRow = function (row) {
+			var defaultRowAttributes = _.object(_.keys($scope.table.named), []);
+			angular.forEach(defaultRowAttributes, function (element, index) {
+				if (!row[index]) {
+					row[index] = null;
+				}
 			});
 			$scope.populateMetadata(row);
 			$scope.data.unshift(row);
 			//populate the original data so the indexes align, side effect is undo doesn't remove inserted objects
 			$scope.originalData.unshift(angular.copy(row));
+			Transit.broadcast('EventRowInserted', row);
 			return row;
 		};
 		$scope.isValidRow = function (row) {
@@ -325,7 +361,23 @@ Application.controller('GridController', [
 			}
 			$scope.data[index]['@metadata'].action = action;
 		};
-		$scope.$on('ngGridEventEndCellEdit', function (event) {
+
+		$scope.$on('ngGridEventStartCellEdit', function (event, data) {
+			Transit.ping({
+				broadcast: 'CheckStartEdit',
+				data: {test:true},
+				onReply: function (event, data) {
+					if (data === false) {
+						$('*').blur();
+					}
+				}
+			}, window.parent);
+		});
+
+		$scope.$on('ngGridEventDigestCell', function (event, data) {
+			console.log('digesting grid');
+		});
+		$scope.$on('ngGridEventEndCellEdit', function (event, data) {
 			var row = event.targetScope.$eval('row');
 			var data = {
 				row: row.entity,
@@ -337,7 +389,7 @@ Application.controller('GridController', [
 				data.isChanged = true;
 				$scope.setRowAction(data.index, 'UPDATE', false);
 			}
-			Transit.broadcast('RowEdit', data);
+			Transit.broadcast('EventRowEdit', data);
 		});
 		$scope.replaceLocalUpdates = function (updates, summary) {
 			angular.forEach(summary, function (element, index) {
@@ -372,8 +424,26 @@ Application.controller('GridController', [
 				$scope.appendRows($scope.nextBatch);
 			}
 		};
-		$rootScope.controls.insert = function () {
-			$scope.addRow();
+		$scope.isRowInsertAllowed = true;
+		$rootScope.controls.insert = function (row) {
+			Transit.ping({
+				broadcast: 'CheckAddRow',
+				data: {},
+				onReply: function (event, data) {
+					if (!data) {
+						$scope.isRowInsertAllowed = true;
+					}
+				}
+			});
+
+			$timeout(function () {
+				if (!$scope.isRowInsertAllowed) {return;}
+				if (!row) {
+					row = {};
+				}
+				$scope.addRow(row);
+
+			}, 150);
 		};
 		$rootScope.controls.save = function () {
 			var inserts = $scope.findInserts($scope.data, $scope.originalData);
@@ -405,7 +475,6 @@ Application.controller('GridController', [
 			}
 		};
 		$rootScope.controls.search = function () {
-			console.log($scope.filters);
 			if (!$scope.filters.length) {
 				$rootScope.controls.addFilter();
 			}
@@ -424,16 +493,30 @@ Application.controller('GridController', [
 		$rootScope.controls.removeFilter = function (index) {
 			$scope.filters.splice(index, 1);
 		};
+		$scope.isSearchRunnable = true;
 		$rootScope.controls.runSearch = function (filters) {
-			var parsed = 'filter=';
-			var filterArr = [];
-			angular.forEach(filters, function (filter, index) {
-				//column.name + operator.prefix + filter.text + operator.suffix
-				//customers %{text}%
-				filterArr[index] = filter.column.name + filter.operator.prefix + filter.text + filter.operator.suffix;
-			});
-			parsed += filterArr.join(' AND ');
-			$scope.getRows(Data.auth.endpoint, parsed);
+			Transit.ping({
+				broadcast: 'CheckBeforeSearch',
+				data: $scope.filters,
+				onReply: function (event, data) {
+					if (!data) {
+						$scope.isSearchRunnable = false;
+					}
+				},
+			}, window.parent);
+
+			$timeout(function () {
+				if (!$scope.isSearchRunnable) { return; }
+				var parsed = 'filter=';
+				var filterArr = [];
+				angular.forEach(filters, function (filter, index) {
+					//column.name + operator.prefix + filter.text + operator.suffix
+					//customers %{text}%
+					filterArr[index] = filter.column.name + filter.operator.prefix + filter.text + filter.operator.suffix;
+				});
+				parsed += filterArr.join(' AND ');
+				$scope.getRows(Data.auth.endpoint, parsed);
+			}, 150);
 		};
 
 
@@ -442,7 +525,7 @@ Application.controller('GridController', [
 		//no expectations
 		Transit.on('ControlDel', $rootScope.controls.del);
 		//no expectations
-		Transit.on('ControlsFetch', $rootScope.controls.fetch);
+		Transit.on('ControlFetch', $rootScope.controls.fetch);
 		//expects data to be row in grid
 		Transit.on('ControlSelectRow', function (event, data) {
 			$scope.options.selectRow(data, true);
@@ -453,20 +536,31 @@ Application.controller('GridController', [
 		});
 		//expects data to be $scope.filters object
 		Transit.on('ControlRunSearch', function (event, data) {
+			console.log('search', data);
 			$rootScope.controls.runSearch(data);
 		});
-		//expects index and row object
-		Transit.on('ControlUpdateRow', function (event, data) {});
+		//expects data.index and a data.row object
+		Transit.on('ControlUpdateRow', function (event, data) {
+			$scope.data[data.index] = _.extend($scope.data[data.index], data.row);
+		});
+		//expects a new data.row object
+		Transit.on('ControlInsertRow', function (event, data) {
+			$scope.controls.insert(data.row);
+		});
 
 		Transit.on('GetFrameState', function (event, data) {
 			var snapshot = {
 				table: $scope.table,
 				operators: $scope.operators
 			};
-			Transit.broadcast(data, snapshot)
+			Transit.broadcast(data, snapshot);
 		});
-		Transit.on('GetAllRows', function (event, data) {});
-		Transit.on('GetSelectedRows', function (event, data) {});
-		Transit.on('GetFilters', function (event, data) {});
+		Transit.on('GetAllRows', function (event, data) {
+			Transit.broadcast(data, $scope.data);
+		});
+		//Transit.on('GetSelectedRows', function (event, data) {});
+		Transit.on('GetFilters', function (event, data) {
+			Transit.broadcast(data, $scope.filters);
+		});
 	}
 ]);
