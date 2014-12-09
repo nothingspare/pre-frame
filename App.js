@@ -48,6 +48,7 @@ Application.run([
 				parentColumns: {
 					//product: [{field:'name', displayName: 'NAMED'}]
 				},
+				controlBox: 'bottom',
 				css: {},
 				js: {}
 			};
