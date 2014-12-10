@@ -89,10 +89,11 @@ Application.controller('GridController', [
 				$scope.data = rows;
 				$scope.originalData = angular.copy(rows);
 				$scope.refreshColDefs();
+				$(window).resize();
 			});
 		};
 
-		$scope.refreshColDefs = function (specialColumns) {
+		$scope.refreshColDefs = function () {
 			$scope.colDefs = [];
 			if ($rootScope.config.columns) {
 				$scope.colDefs = $rootScope.config.columns;
@@ -108,9 +109,14 @@ Application.controller('GridController', [
 						angular.forEach(words, function (word) {
 							display.push(_.capitalize(word));
 						});
+
 						colDef = {
 							field: column,
-							displayName: display.join(' ')
+							displayName: display.join(' '),
+						}
+
+						if ($scope.table && $scope.table.named) {
+							colDef.cellClass = 'generic-type-' + $scope.table.named[column].generic_type;
 						}
 
 						if (colDef) {
@@ -231,6 +237,13 @@ Application.controller('GridController', [
 			showSelectionCheckbox: true,
 			showFooter: true,
 			footerTemplate: 'gridFooter.html',
+			rowTemplate: '<div ' +
+				'ng-style="{ \'cursor\': row.cursor }" ' +
+				'ng-repeat="col in renderedColumns" ' +
+				'ng-class="col.colIndex()" ' +
+				'class="ngCell {{col.cellClass}} {{row.entity[\'@metadata\'].action && \'modified\'}}">' +
+					'<div class="ngVerticalBar" ng-style="{height: rowHeight}" ng-class="{ ngVerticalBarVisible: !$last }">&nbsp;</div><div ng-cell></div>' +
+				'</div>',
 			beforeSelectionChange: function (row) {
 				Transit.broadcast('EventBeforeSelection', row.entity);
 				return true;
@@ -238,7 +251,8 @@ Application.controller('GridController', [
 			afterSelectionChange: function (row) {
 				if (row.selected) {
 					Transit.broadcast('EventRowSelected', row.entity);
-					$scope.selected[row.rowIndex] = $scope.data[row.rowIndex];
+					var index = $scope.data.indexOf(row.entity);
+					$scope.selected[index] = $scope.data[index];
 				}
 				else {
 					Transit.broadcast('EventRowDeselected', row.entity);
@@ -390,6 +404,7 @@ Application.controller('GridController', [
 				$scope.setRowAction(data.index, 'UPDATE', false);
 			}
 			Transit.broadcast('EventRowEdit', data);
+			console.log(event.targetScope.row.entity);
 		});
 		$scope.replaceLocalUpdates = function (updates, summary) {
 			angular.forEach(summary, function (element, index) {
@@ -412,6 +427,7 @@ Application.controller('GridController', [
 						if (e['@metadata'].href == element['@metadata'].href) {
 							$scope.data.splice(i, 1);
 							$scope.originalData.splice(i, 1);
+							$scope.selected.splice(i, 1);
 						}
 					}
 				});
@@ -419,9 +435,43 @@ Application.controller('GridController', [
 			$scope.forceGridRefresh();
 		};
 
+		$(window).resize(function () {
+			$scope.$evalAsync(function () {
+				console.log($('.ngRow').length)
+				var controlHeight = 60
+				var maxHeight = $scope.data.length * '30';
+				var height = $(window).height() - controlHeight;
+				if (maxHeight < height) {
+					height = maxHeight + controlHeight;
+				}
+				$('.ngGrid').height(height);
+			});
+		});
+
+		$scope.alertMessage = null;
+		$scope.prevAlert = null;
+		$scope.alert = function (message, timeout) {
+			if (!timeout) { timeout = 2500; }
+			$scope.alertMessage = message;
+			if ($scope.prevAlert) {
+				$timeout.cancel($scope.prevAlert);
+			}
+			$scope.prevAlert = $timeout(function () {
+				$scope.alertMessage = null;
+			}, timeout);
+		};
+		$scope.modal = function (message) {
+			return $modal.open({
+				template: message,
+				windowClass: 'alert-modal',
+				controller: function () {}
+			});
+		};
+
 		$rootScope.controls.fetch = function () {
 			if ($scope.nextBatch) {
 				$scope.appendRows($scope.nextBatch);
+				$scope.alert('Fetching ...');
 			}
 		};
 		$scope.isRowInsertAllowed = true;
@@ -445,6 +495,7 @@ Application.controller('GridController', [
 
 			}, 150);
 		};
+
 		$rootScope.controls.save = function () {
 			var inserts = $scope.findInserts($scope.data, $scope.originalData);
 			var updates = $scope.findUpdates($scope.data, $scope.originalData);
@@ -453,12 +504,25 @@ Application.controller('GridController', [
 
 			//if we have any batch attributes, save them
 			if (!angular.equals({}, batch)) {
+				$scope.alert('Saving ...');
 				$scope.save(_.values(batch)).success(function (data) {
 					$scope.replaceLocalInserts(inserts, data.txsummary);
 					$scope.replaceLocalUpdates(updates, data.txsummary);
 					console.log(updates, data);
+					var modified = {};
+					angular.forEach(data.txsummary, function (element, index) {
+						if ($scope.isValidRow(element)) {
+							if (!modified[element['@metadata'].verb]) { modified[element['@metadata'].verb] = 0; }
+							modified[element['@metadata'].verb]++
+						}
+					});
+					var alertFragments = [];
+					angular.forEach(modified, function (count, action) {
+						alertFragments.push(action + ': ' + count);
+					});
+					$scope.alert('[Objects Modified] ' + alertFragments.join(', '), 4000);
 				})['error'](function (err) {
-					console.log(err);
+					$scope.modal(err.errorMessage);
 				});
 			}
 		};
@@ -471,6 +535,7 @@ Application.controller('GridController', [
 					$scope.removeLocalDels($scope.selected, data.txsummary);
 				})['error'](function (err) {
 					console.log(err);
+					$scope.modal(err.errorMessage);
 				});
 			}
 		};
@@ -506,6 +571,7 @@ Application.controller('GridController', [
 			}, window.parent);
 
 			$timeout(function () {
+				$scope.alert('Searching ...');
 				if (!$scope.isSearchRunnable) { return; }
 				var parsed = 'filter=';
 				var filterArr = [];

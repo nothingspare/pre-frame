@@ -6,9 +6,8 @@
 		<link rel="stylesheet" href="bootstrap.css"/>
 		<style>
 			body{ margin:0; }
-			.content{ height:720px; }
-			.content .ngGrid{ height:660px; }
 			.modal-content .ngGrid{ height:300px; }
+			.ngViewport .generic-type-number{ text-align: right; }
 			.body .ngHeaderCell{ background:#fff; color:#333; border:none; }
 			.body .ngHeaderCell .ngVerticalBarVisible{ background-color:#fff; }
 			.body .ngRow.even{ background:#f9f9f9; }
@@ -21,6 +20,23 @@
 			.modal-content .filters{ padding-bottom:20px; }
 			.body .filters button{ border-top:1px #d6d6d6 solid; border-left:1px #d6d6d6 solid; margin:2px 0; }
 			.body .ngRow.selected{ background: #DEF7E0;}
+			.body .modified{ background:rgba(243,244,199, .75); }
+			.body .grid-alert-box{
+				position: absolute; top: 0; z-index: 1000; right: 0; margin: 10px 20px;
+				padding: 5px 10px; background: #DEF7E0; border-radius: 3px;
+				transition: opacity 1s;
+				-webkit-transition: opacity 1s;
+				-mox-transition: opacity 1s;
+				-ms-transition: opacity 1s;
+				-o-transition: opacity 1s;
+				opacity: 0;
+				visibility:hidden;
+			}
+			.body .grid-alert-box.display{
+				opacity:1;
+				visibility:visible;
+			}
+			.body .alert-modal .modal-content{ padding: 20px; }
 		</style>
 		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/ng-grid/2.0.11/ng-grid.css"/>
 
@@ -53,7 +69,7 @@
 	<body class="body">
 		<div id="container" ng-app="Application">
 			<div class="content" ng-controller="GridController">
-				<div ng-if="config.controlBox == 'top'">
+				<div class="controls-box controls-top" ng-if="config.controlBox == 'top'">
 					<div class="filters" ng-if="config.controls.search" ng-show="params.filters">
 						<button ng-click="controls.addFilter();">Add Filter</button>
 						<div ng-repeat="filter in filters" class="form-inline">
@@ -68,7 +84,7 @@
 					</div>
 				</div>
 				<div class="gridStyle" ng-grid="options"></div>
-				<div ng-if="config.controlBox == 'bottom'">
+				<div class="controls-box controls-bottom" ng-if="config.controlBox == 'bottom'">
 					<div class="filters" ng-if="config.controls.search" ng-show="params.filters">
 						<button ng-click="controls.addFilter();">Add Filter</button>
 						<div ng-repeat="filter in filters" class="form-inline">
@@ -82,6 +98,7 @@
 						<button ng-click="controls.runSearch(filters);">Run</button>
 					</div>
 				</div>
+				<div class="grid-alert-box {{alertMessage && 'display'}}">{{alertMessage}}</div>
 			</div>
 		</div>
 	</body>

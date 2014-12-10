@@ -33,6 +33,12 @@ Application.run([
 		//listen for init updates with new config data
 		Transit.on('init', function (event, data) {
 			var defaults = {
+				auth: {
+					username: 'demo',
+					password: 'Password1',
+					apiBase: 'https://eval.espressologic.com/rest/livedemo/demo/v1',
+					endpoint: 'customer'
+				},
 				controls: {
 					insert: true,
 					save: true,
@@ -49,6 +55,7 @@ Application.run([
 					//product: [{field:'name', displayName: 'NAMED'}]
 				},
 				controlBox: 'bottom',
+				globalFeedback: true,
 				css: {},
 				js: {}
 			};
